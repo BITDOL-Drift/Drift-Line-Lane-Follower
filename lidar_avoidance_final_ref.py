@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+#==============================================================================
+# Title: lidar_avoidance_final_ref.py
+# Description: ROS node for lidar avoidance _ REFERENCE
+# Author: @GyJin-Kyung @Songhee-LEE @Takyoung-KIM
+# Date: 2022-10-19
+# Version: 0.1
+# Usage: roslaunch lidar_avoidance_final_ref lidar_avoidance_final_ref.launch
+# ROS node for lidar avoidance
+#==============================================================================
+
 # BEGIN ALL
 import rospy
 import os
