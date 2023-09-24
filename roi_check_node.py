@@ -8,7 +8,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
 cv_bridge = CvBridge()
-class COLOR_FILTER:
+class ROI_C:
     def __init__(self, ref_image=None):
         rospy.init_node('color_filter', anonymous=True)
         # image BGR->HSV로 변환
@@ -61,9 +61,22 @@ class COLOR_FILTER:
         self.update_color()
         pass
     
-    def detect_callback(self,image):
+    def image_callback(self,image):
         cimg = cv_bridge.imgmsg_to_cv2(image, "bgr8")
         self.image = cimg
+        
+        
+        # transformation
+        editted_tmp_img = cv2.resize(cimg, None, fx=0.6, fy=0.6,
+                                        interpolation=cv2.INTER_CUBIC)
+        #print editted_tmp_img.shape
+        rows, cols, ch = editted_tmp_img.shape
+        pts1 = np.float32([[10,80],[0,130],[180,80],[190,130]]) #[[15,60],[5,130],[180,60],[190,130]]
+        pts2 = np.float32([[0, 0], [0, 300], [300, 0], [300, 300]])
+        M = cv2.getPerspectiveTransform(pts1, pts2)
+        # editted_img_size = (editted_tmp_img.shape[1], editted_tmp_img.shape[0])
+        self.editted_img = cv2.warpPerspective(editted_tmp_img, M, (300, 300))  # img_size
+        self.editted_img_hsv = cv2.cvtColor(self.editted_img, cv2.COLOR_BGR2HSV)    
         self.image_hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
         self.update_color()
         
@@ -81,6 +94,27 @@ class COLOR_FILTER:
             cv2.bitwise_and(self.ref_image_hsv, self.ref_image_hsv, mask=self.ref_image_mask),
             cv2.COLOR_HSV2BGR,
         )
+        #######=====CHECK+++ROI====######
+        lower_red = np.array([0,223,123])
+        upper_red = np.array([17,255,255])
+        lower_red2 = np.array([240,42,96])
+        upper_red2 = np.array([255,255,255])
+        
+        maskr = cv2.inRange(self.editted_img_hsv, lower_red, upper_red)
+        maskr2 = cv2.inRange(self.editted_img_hsv, lower_red2, upper_red2)
+        maskr4 = cv2.bitwise_or(maskr2, maskr)
+		# filter mask
+        kernel = np.ones((7, 7), np.uint8)
+        opening = cv2.morphologyEx(maskr4, cv2.MORPH_OPEN, kernel)
+        rgb_yb2 = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)
+        out_img = rgb_yb2.copy()
+        h, w = out_img.shape
+        search_top = int(1*h/4+20)
+        search_bot = int(3*h/4+20)
+        search_mid = int(w/2)
+        out_img[0:search_top, 0:w] = 0
+        out_img[search_bot:h, 0:w] = 0
+        #######=====CHECK+++ROI====######
         return
 
     def lhue_control(self, x):
@@ -131,9 +165,14 @@ class COLOR_FILTER:
             cv2.imshow("mask", self.mask)
             cv2.imshow("result", self.res)
             cv2.imshow("hsv filter trackbar", self.ref_image_res)
+            cv2.imshow("editted image",self.editted_image)
+            
+            
+            
             pixel_count = cv2.countNonZero(self.mask)
             total_pixel_count = self.image.shape[0] * self.image.shape[1]
             area_ratio = pixel_count / total_pixel_count
+            print(f"이미지 크기: {self.image.shape}")
             print(f"영역의 원본 대비 비율: {area_ratio:.2%}")
             if cv2.waitKey(1) & 0xFF == 27:
                 break
@@ -153,6 +192,6 @@ class COLOR_FILTER:
 
 if __name__ == "__main__":
     img = cv2.imread("img_src/hsv_table.png", cv2.IMREAD_COLOR)
-    color_filter_node = COLOR_FILTER(img)
-    image_sub = rospy.Subscriber('/usb_cam/image_raw', Image, color_filter_node.detect_callback, queue_size=1, buff_size=52428800)
+    color_filter_node = ROI_C(img)
+    image_sub = rospy.Subscriber('/usb_cam/image_raw', Image, color_filter_node.image_callback, queue_size=1, buff_size=52428800)
     color_filter_node.run()
