@@ -73,13 +73,13 @@ class Follower:
         lateral_count = 0
 
         for d in self.dists:
-            if d < 0.55:  # 0.55
+            if d < 0.6:  # 0.55
                 lateral_count += 1
                 # return 40 #70
 
         if lateral_count >= 1:
             print("lateral_cnt : {}".format(lateral_count))
-            return 80
+            return 100
         else:
             print("lateral_cnt : {}".format(lateral_count))
             return 0
@@ -125,11 +125,17 @@ class Follower:
 		# upper_red2 = numpy.array([255,255,255])
   
 		#####=====IT2-STUDYROOM=====#####
-        lower_red = numpy.array([0,223,123])
-        upper_red = numpy.array([17,255,255])
-        lower_red2 = numpy.array([240,42,96])
-        upper_red2 = numpy.array([255,255,255])
+        #lower_red = numpy.array([0,223,123])
+        #upper_red = numpy.array([17,255,255])
+        #lower_red2 = numpy.array([240,42,96])
+        #upper_red2 = numpy.array([255,255,255])
+
+        lower_red = numpy.array([143,75,53])
+        upper_red = numpy.array([202,255,255])
+        lower_red2 = numpy.array([0,75,53])
+        upper_red2 = numpy.array([10,255,255])
         
+
         maskr = cv2.inRange(hsv, lower_red, upper_red)
         maskr2 = cv2.inRange(hsv, lower_red2, upper_red2)
         maskr4 = cv2.bitwise_or(maskr2, maskr)
@@ -192,7 +198,7 @@ class Follower:
 
                 # K_p = 0.5
                 if offset != 0 and abs(ang_z) > 0.1:
-                    K_p = 0.5 
+                    K_p = 0.7 
                 else:
                     # K_p = 2.3
                     K_p = 1.0
@@ -207,7 +213,7 @@ class Follower:
                     ang_zt1 = 0.0
 
                 self.twist.linear.x = lin_x + 0.2
-                self.twist.angular.z = -min(0.1, max(-0.1, ang_zt1))
+                self.twist.angular.z = -min(0.3, max(-0.3, ang_zt1))
                 # print("cx:{}, cxm:{}, err:{:.4f}, ang_z:{:4f}, lin_x:{:4f}".format(cx, cxm, err*0.0015, ang_z, lin_x))
 
                 serr = err + serr
@@ -219,10 +225,10 @@ class Follower:
                 #1.57            
             
                 if ang_zt1 < 0:
-                    ang_zt1 += (-0.015)
+                    ang_zt1 += (-0.01)
                 else:
-                    ang_zt1 += 0.015
-                ang_zt1 = min(1.0, max(-1.0, ang_zt1))
+                    ang_zt1 += 0.01
+                ang_zt1 = min(0.8, max(-0.8, ang_zt1))
                 
                 self.twist.angular.z = -ang_zt1 #-0.3
                 print(str(ang_zt1)+"\n")
