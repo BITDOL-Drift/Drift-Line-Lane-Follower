@@ -83,14 +83,26 @@ class Follower:
 		#upper_red = numpy.array([10,255,255])
 		#lower_red2 = numpy.array([160,100,100])
 		#upper_red2 = numpy.array([180,255,255])
-		lower_red = numpy.array([-10,50,100])
-		upper_red = numpy.array([10,255,255])
-		lower_red2 = numpy.array([160,50,100])
-		upper_red2 = numpy.array([179,255,255])
+		# lower_red = numpy.array([-10,50,100])
+		# upper_red = numpy.array([10,255,255])
+		# lower_red2 = numpy.array([160,50,100])
+		# upper_red2 = numpy.array([179,255,255])
 		#lower_red = numpy.array([0,40,175])
 		#upper_red = numpy.array([20,200,255])
 		#lower_red2 = numpy.array([110,0,200])
 		#upper_red2 = numpy.array([180,160,255])
+  
+		#####=====HANULSO=====#####
+		# lower_red = numpy.array([0,42,96])
+		# upper_red = numpy.array([19,255,255])
+		# lower_red2 = numpy.array([240,42,96])
+		# upper_red2 = numpy.array([255,255,255])
+  
+		#####=====IT2-STUDYROOM=====#####
+		lower_red = numpy.array([0,223,123])
+		upper_red = numpy.array([17,255,255])
+		lower_red2 = numpy.array([240,42,96])
+		upper_red2 = numpy.array([255,255,255])
   
 		maskr = cv2.inRange(hsv, lower_red, upper_red)
 		maskr2 = cv2.inRange(hsv, lower_red2, upper_red2)
@@ -128,7 +140,7 @@ class Follower:
 			# BEGIN CONTROL
 			err = cx - 4*w/8
 		#   K_p = 0.63
-			K_p = 0.5
+			K_p = 0.69
 
 		#   self.twist.linear.x = K_p
 			dt = rospy.get_time() - ptime
@@ -138,6 +150,7 @@ class Follower:
 			ang_z = (float(err) / 100)*(0.25) + \
 				((err - perr)/(rospy.get_time() - ptime))*1/20/100
 			ang_z = min(0.8, max(-0.8, ang_z))
+                        print(ang_z)
 		# 0.143
 			lin_x = ang_z
 			if lin_x < 0:
@@ -145,7 +158,7 @@ class Follower:
 			lin_x = K_p * (1-lin_x)
 
 			#self.twist.linear.x = lin_x
-			self.twist.linear.x = 0.2
+			self.twist.linear.x = 0.5
 			self.twist.angular.z = -ang_z
 
 		#   print(cx, err*0.02, ang_z)
@@ -156,9 +169,9 @@ class Follower:
 			ptime = rospy.get_time()
 
 		else:
-			self.twist.linear.x = 0.1
-			self.twist.angular.z = -0.3
-			err = 0
+			self.twist.linear.x = 0.5
+			#self.twist.angular.z = -0.3
+			#err = 0
 
 		self.cmd_vel_pub.publish(self.twist)
 		output_img = self.bridge.cv2_to_imgmsg(out_img)

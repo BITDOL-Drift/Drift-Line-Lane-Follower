@@ -45,6 +45,7 @@ class Follower:
         )
         self.cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
         self.image_pub = rospy.Publisher("/lane_image", Image, queue_size=1)
+        self.image_debug_pub = rospy.Publisher("/lane_debug_image", Image, queue_size=1)
         self.twist = Twist()
         self.ray_angle = [x for x in range(angle_step_deg, 180, angle_step_deg)]
         self.dists = None
@@ -87,10 +88,10 @@ class Follower:
         global perr, ptime, serr, dt, ang_zt1, ang_zt2
         image0 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
-        # transformation
+        # transformation #
         img = cv2.resize(image0, None, fx=0.6, fy=0.6, interpolation=cv2.INTER_CUBIC)
 
-        # PRINT img.shape
+        # PRINT img.shape #
         rows, cols, ch = img.shape
         pts1 = numpy.float32(
             [[10, 80], [0, 130], [180, 80], [190, 130]]
@@ -98,21 +99,37 @@ class Follower:
         pts2 = numpy.float32([[0, 0], [0, 300], [300, 0], [300, 300]])
         M = cv2.getPerspectiveTransform(pts1, pts2)
         img_size = (img.shape[1], img.shape[0])
-        image = cv2.warpPerspective(img, M, (300, 300))  # img_size
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        debug_image = cv2.warpPerspective(img, M, (300, 300))  # img_size
+        # print("final debug_image shape",debug_image.shape)
+        self.image_debug_pub.publish(self.bridge.cv2_to_imgmsg(debug_image,encoding='rgb8'))
+        hsv = cv2.cvtColor(debug_image, cv2.COLOR_BGR2HSV)
 
         # lower_red = numpy.array([0,100,100])
         # upper_red = numpy.array([10,255,255])
         # lower_red2 = numpy.array([160,100,100])
         # upper_red2 = numpy.array([180,255,255])
-        lower_red = numpy.array([-10, 50, 100])
-        upper_red = numpy.array([10, 255, 255])
-        lower_red2 = numpy.array([160, 50, 100])
-        upper_red2 = numpy.array([179, 255, 255])
+        # lower_red = numpy.array([-10, 50, 100])
+        # upper_red = numpy.array([10, 255, 255])
+        # lower_red2 = numpy.array([160, 50, 100])
+        # upper_red2 = numpy.array([179, 255, 255])
         # lower_red = numpy.array([0,40,175])
         # upper_red = numpy.array([20,200,255])
         # lower_red2 = numpy.array([110,0,200])
         # upper_red2 = numpy.array([180,160,255])
+        
+        
+		#####=====HANULSO=====#####
+		# lower_red = numpy.array([0,42,96])
+		# upper_red = numpy.array([19,255,255])
+		# lower_red2 = numpy.array([240,42,96])
+		# upper_red2 = numpy.array([255,255,255])
+  
+		#####=====IT2-STUDYROOM=====#####
+        lower_red = numpy.array([0,223,123])
+        upper_red = numpy.array([17,255,255])
+        lower_red2 = numpy.array([240,42,96])
+        upper_red2 = numpy.array([255,255,255])
+        
         maskr = cv2.inRange(hsv, lower_red, upper_red)
         maskr2 = cv2.inRange(hsv, lower_red2, upper_red2)
         maskr4 = cv2.bitwise_or(maskr2, maskr)
@@ -175,7 +192,7 @@ class Follower:
 
                 # K_p = 0.5
                 if offset != 0 and abs(ang_z) > 0.1:
-                    K_p = 0.8
+                    K_p = 0.5 
                 else:
                     # K_p = 2.3
                     K_p = 1.0
@@ -189,8 +206,8 @@ class Follower:
                 else:
                     ang_zt1 = 0.0
 
-                self.twist.linear.x = lin_x
-                self.twist.angular.z = -ang_z
+                self.twist.linear.x = lin_x + 0.2
+                self.twist.angular.z = -min(0.1, max(-0.1, ang_zt1))
                 # print("cx:{}, cxm:{}, err:{:.4f}, ang_z:{:4f}, lin_x:{:4f}".format(cx, cxm, err*0.0015, ang_z, lin_x))
 
                 serr = err + serr
@@ -198,14 +215,14 @@ class Follower:
                 ptime = rospy.get_time()
             ####
             else:
-                self.twist.linear.x = 0.1
+                self.twist.linear.x = 0.6
                 #1.57            
             
                 if ang_zt1 < 0:
-                    ang_zt1 += (-0.01)
+                    ang_zt1 += (-0.015)
                 else:
-                    ang_zt1 += 0.01
-                ang_zt1 = min(0.8, max(-0.8, ang_zt1))
+                    ang_zt1 += 0.015
+                ang_zt1 = min(1.0, max(-1.0, ang_zt1))
                 
                 self.twist.angular.z = -ang_zt1 #-0.3
                 print(str(ang_zt1)+"\n")
