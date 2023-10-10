@@ -216,8 +216,8 @@ class Follower:
                 self.twist.angular.z = -min(0.3, max(-0.3, ang_zt1))
                 # print("cx:{}, cxm:{}, err:{:.4f}, ang_z:{:4f}, lin_x:{:4f}".format(cx, cxm, err*0.0015, ang_z, lin_x))
 
-                serr = err + serr
-                perr = err
+                serr = err + serr # I항
+                perr = err # D항
                 ptime = rospy.get_time()
             ####
             else:
