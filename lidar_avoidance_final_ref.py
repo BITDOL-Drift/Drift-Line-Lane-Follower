@@ -73,7 +73,7 @@ class Follower:
         lateral_count = 0
 
         for d in self.dists:
-            if d < 0.6:  # 0.55
+            if d < 0.65:  # 0.55
                 lateral_count += 1
                 # return 40 #70
 
@@ -212,7 +212,7 @@ class Follower:
                 else:
                     ang_zt1 = 0.0
 
-                self.twist.linear.x = lin_x + 0.2
+                self.twist.linear.x = lin_x + 0.3
                 self.twist.angular.z = -min(0.3, max(-0.3, ang_zt1))
                 # print("cx:{}, cxm:{}, err:{:.4f}, ang_z:{:4f}, lin_x:{:4f}".format(cx, cxm, err*0.0015, ang_z, lin_x))
 
@@ -221,7 +221,7 @@ class Follower:
                 ptime = rospy.get_time()
             ####
             else:
-                self.twist.linear.x = 0.6
+                self.twist.linear.x = 0.7
                 #1.57            
             
                 if ang_zt1 < 0:
