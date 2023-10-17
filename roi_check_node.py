@@ -66,6 +66,7 @@ class ROI_CHECK:
         self.image_hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
         self.ref_image_hsv = self.image_hsv
         self.editted_image_hsv = self.image_hsv
+        self.editted_tmp_image = ref_image
         self.lhue = 0
         self.lsat = 0
         self.lval = 0
@@ -81,10 +82,10 @@ class ROI_CHECK:
 
         ##########=====CHECK+++ROI====##########
         # transformation
-        editted_tmp_img = cv2.resize(
+        self.editted_tmp_image = cv2.resize(
             self.image, None, fx=0.6, fy=0.6, interpolation=cv2.INTER_CUBIC
         )
-        rows, cols, ch = editted_tmp_img.shape
+        rows, cols, ch = self.editted_tmp_image.shape
 
         #### ADD LINES FOR pts1 ####
         dot1 = np.array([10, 80])
@@ -92,40 +93,40 @@ class ROI_CHECK:
         dot3 = np.array([180, 80])
         dot4 = np.array([190, 130])
         cv2.circle(
-            self.image, (dot1[0], dot1[1]), radius=5, color=(255, 0, 0), thickness=-1
+            self.editted_tmp_image, (dot1[0], dot1[1]), radius=5, color=(255, 0, 0), thickness=-1
         )
         cv2.circle(
-            self.image, (dot2[0], dot2[1]), radius=5, color=(255, 0, 0), thickness=-1
+            self.editted_tmp_image, (dot2[0], dot2[1]), radius=5, color=(255, 0, 0), thickness=-1
         )
         cv2.circle(
-            self.image, (dot3[0], dot3[1]), radius=5, color=(255, 0, 0), thickness=-1
+            self.editted_tmp_image, (dot3[0], dot3[1]), radius=5, color=(255, 0, 0), thickness=-1
         )
         cv2.circle(
-            self.image, (dot4[0], dot4[1]), radius=5, color=(255, 0, 0), thickness=-1
+            self.editted_tmp_image, (dot4[0], dot4[1]), radius=5, color=(255, 0, 0), thickness=-1
         )
         cv2.line(
-            self.image,
+            self.editted_tmp_image,
             (dot1[0], dot1[1]),
             (dot2[0], dot2[1]),
             color=(255, 255, 255),
             thickness=1,
         )
         cv2.line(
-            self.image,
+            self.editted_tmp_image,
             (dot2[0], dot2[1]),
             (dot4[0], dot4[1]),
             color=(255, 255, 255),
             thickness=1,
         )
         cv2.line(
-            self.image,
+            self.editted_tmp_image,
             (dot4[0], dot4[1]),
             (dot3[0], dot3[1]),
             color=(255, 255, 255),
             thickness=1,
         )
         cv2.line(
-            self.image,
+            self.editted_tmp_image,
             (dot3[0], dot3[1]),
             (dot1[0], dot1[1]),
             color=(255, 255, 255),
@@ -140,7 +141,7 @@ class ROI_CHECK:
         M = cv2.getPerspectiveTransform(pts1, pts2)
         # editted_img_size = (editted_tmp_img.shape[1], editted_tmp_img.shape[0])
         self.editted_image = cv2.warpPerspective(
-            editted_tmp_img, M, (300, 300)
+            self.editted_tmp_image, M, (300, 300)
         )  # img_size
         self.editted_image_hsv = cv2.cvtColor(self.editted_image, cv2.COLOR_BGR2HSV)
         ########################################
@@ -234,7 +235,7 @@ class ROI_CHECK:
             cv2.imshow("image", self.image)
             # cv2.imshow("mask", self.mask)
             cv2.imshow("result", self.image_res)
-            cv2.imshow("editted image", self.editted_image)
+            cv2.imshow("editted image", self.editted_tmp_image)
             cv2.imshow("editted image result", self.editted_image_res)
 
             pixel_count = cv2.countNonZero(self.mask)
