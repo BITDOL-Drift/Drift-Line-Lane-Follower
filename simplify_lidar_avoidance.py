@@ -30,6 +30,8 @@ green_cnt = 0
 err1_prev = 0 
 err2_prev = 0
 
+lidar_flag = False
+
 
 class Follower:
     def __init__(self):
@@ -52,7 +54,7 @@ class Follower:
 
         ###------------------ 파라미터 수정 -----------------------###
         ##@@ 실행 모드
-        self.debug = True
+        self.debug = False
 
         ##@@ 라인검출 색 범위
         self.lower_red = numpy.array([143,75,53])
@@ -66,11 +68,12 @@ class Follower:
         self.D1 = 0.014
 
         # main
-        self.K2 = 0.004
+        self.K2 = 0.0055
         self.D2 = 0.007
 
+        self.dis_thres = 0.55
         self.obj_offset1 = 0#100
-        self.obj_offset2 = 0
+        self.obj_offset2 = 50
         ###======================================================###
 
 
@@ -84,11 +87,24 @@ class Follower:
             # print(green_cnt)
 
     ## : /scan_raw 토픽에 따른 콜백함수 - lidar값 저장
+    '''
+    msg는 lidar 데이터를 msg.ranges 멤버변수에 720길이의 list로 저장하고 있다. 값의 단위는 'm'다. 거리값은 꽤 정확하다.
+    앞를 향하고 있는 cilabrobot을 위에서 볼 때, 
+    12시방향 lidar값은 msg.ranges[0],
+    9시방향 lidar값은 msg.ranges[180],
+    6시방향 lidar값은 msg.ranges[360],
+    3시방향 lidar값은 msg.ranges[540],
+    인덱스마다 0.5도 증가 된다.
+    c.f) cilabrobot 케이스는 너무 매끈해서 물체 인식이 안됨. lidar 적외선 반사되는 듯
+    '''
     def lidar_callback(self, msg):
         # static offset
-        angles = [x for x in range(-5, -90, -5)]  # -5, -90, -5
-        print(angles)
+        # angles = [x for x in range(0, -90, -5)]  # [0, -5 , -10, ... , -85] : 12시에서 CW로 0~90도 사이 물체 탐지
+        angles = [x for x in range(0, -90, -5)]  # [-60, -65 , ... , -295] : 12시에서 CW로 30~150도 사이 물체 탐지
         self.dists = [msg.ranges[x * 2] for x in angles]
+        # self.dists = [round(x,2) for x in self.dists]
+        # print(self.dists)
+        
 
 
     
@@ -121,24 +137,28 @@ class Follower:
 
         # ============================================================================= #
 
-
+        lidar_flag = False
         # ----------------------- calculate offset -------------------------- #
         if self.dists != None:
+
             lateral_count = 0
             for d in self.dists:
-                if d < 0.65:  # 0.55
+                if d < self.dis_thres: 
                     lateral_count += 1
 
             if lateral_count >= 1:
                 # print("lateral_cnt : {}".format(lateral_count))
                 roi1_offset = self.obj_offset1
                 roi2_offset = self.obj_offset2
+                lidar_flag = True
             else:
                 roi1_offset = 0
                 roi2_offset = 0
         else:
             roi1_offset = 0
             roi2_offset = 0
+
+        print(roi2_offset)
         # ============================================================================= #
 
 
@@ -227,15 +247,22 @@ class Follower:
         sp=2, K1=0.004 D1=0.014  basic- swing
 
         ang = err2 * self.K2 + derr2 * self.D2 : 
-        sp=2, K2=0.004 D2=0.14  little swing
-        sp=2, K2=0.004 D2=0.18  little swing but crash
-        sp=2, K2=0.004 D2=0.12  almost no swing
-        sp=2, K2=0.004 D2=0.10  no swing !!!
-        sp=2, K2=0.004 D2=0.08  no swing at all !!!!!!
-        sp=2, K2=0.004 D2=0.06  no swing at all !!!!!!
-        sp=2, K2=0.004 D2=0.01  a lot swing 
-        sp=2, K2=0.004 D2=0.04  little swing 
-        sp=2, K2=0.004 D2=0.07  no swing at all !!!!!! - perfect 
+        sp=2, K2=0.004 D2=0.014  little swing
+        sp=2, K2=0.004 D2=0.018  little swing but crash
+        sp=2, K2=0.004 D2=0.012  almost no swing
+        sp=2, K2=0.004 D2=0.010  no swing !!!
+        sp=2, K2=0.004 D2=0.008  no swing at all !!!!!!
+        sp=2, K2=0.004 D2=0.006  no swing at all !!!!!!
+        sp=2, K2=0.004 D2=0.001  a lot swing 
+        sp=2, K2=0.004 D2=0.004  little swing 
+        sp=2, K2=0.004 D2=0.007  no swing at all !!!!!! - perfect 
+        sp=2, K2=0.005 D2=0.007  no swing !!!!!! - good
+        sp=2, K2=0.006 D2=0.007  little swing
+        sp=2, K2=0.006 D2=0.008  basic swing
+        sp=2, K2=0.006 D2=0.006  basic swing
+        
+        sp=2, K2=0.0055 D2=0.007  no swing at all !!!!!! - perfect 
+        K가 높을 수록 반응성이 좋기 떄문에 와블링이 되지 않는 선에서 최대한 올리는 것이 좋다.
 
         '''
 
@@ -245,10 +272,16 @@ class Follower:
             # ang = err1 * self.K1 + derr1 * self.D1
             ang = err2 * self.K2 + derr2 * self.D2
 
-
-            
             self.twist.linear.x = speed
             self.twist.angular.z = -ang
+            
+            # if lidar_flag == False:
+            #     self.twist.linear.x = speed
+            #     self.twist.angular.z = -ang
+            # else:
+            #     self.twist.linear.x = 1
+            #     self.twist.angular.z = -ang
+
             
         # ==================================================================== #
         
