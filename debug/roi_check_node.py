@@ -260,7 +260,7 @@ class ROI_CHECK:
 
 
 if __name__ == "__main__":
-    img = cv2.imread("img_src/hsv_table.png", cv2.IMREAD_COLOR)
+    img = cv2.imread("../img_src/hsv_table.png", cv2.IMREAD_COLOR)
     color_filter_node = ROI_CHECK(img)
     image_sub = rospy.Subscriber(
         "/usb_cam/image_raw",
