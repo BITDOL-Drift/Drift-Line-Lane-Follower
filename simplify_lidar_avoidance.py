@@ -28,9 +28,15 @@ global green_cnt
 green_cnt = 0
 
 err1_prev = 0 
-err2_prev = 0
+err_prev = 0
 
-lidar_flag = False
+h = 144
+w = 192
+w_mid = 96 # 120일 때 선을 거의 중앙에 둠, 근데 그럼 좌우 턴 최대값이 달라질 수 있음
+
+roi_down = 108     # 3/4 * h
+roi_up = 72        # 2/4 * h
+roi_mid = 90
 
 
 class Follower:
@@ -47,9 +53,11 @@ class Follower:
 
         self.twist = Twist()
         self.cmd_vel_pub.publish(self.twist)
-        self.roi_center_pix = [0,0,0,0] # 1~3 index will be used
+        self.roi_center_pix = 0 # 1~3 index will be used
 
-        self.dists = None
+        self.rngL = None
+        self.rngR = None
+        self.rngM = None
         self.traffic_color = 0
 
         ###------------------ 파라미터 수정 -----------------------###
@@ -64,16 +72,45 @@ class Follower:
 
         # ! linear.x, angular.z는 cilab_driver에서 1000이 곱해져 register값으로 적용된다. 0.001까지 유효하다.
         ##@@ 제어 파라미터
-        self.K1 = 0.004
-        self.D1 = 0.014
+        # self.K1 = 0.004
+        # self.D1 = 0.014
 
         # main
-        self.K2 = 0.0055
-        self.D2 = 0.007
+        self.base_K = 0.004  #0004
+        self.slow_K = 0.008  #0007
+        '''
+        sp = 1 일 때, K = 0.010이면 와블링된다. 
+        sp = 1 일 때, K = 0.007이면 good
 
-        self.dis_thres = 0.55
-        self.obj_offset1 = 0#100
-        self.obj_offset2 = 50
+        sp = 1 일 때, K = 0.007, D = 0.001 very good, 변환에 조금 둔하긴 한데 overshoot거의 없음
+        sp = 1 일 때, K = 0.008, D = 0.001 very good, 반응성이 좋아지는 대신 변화 후 초반 진동이 있다.
+        sp = 1 일 때, K = 0.007, D = 0.003 very good, 변환에서 리버스없고 진동 잘잡는 듯
+        '''
+        self.base_D = 0.007 #0007
+        self.slow_D = 0.001 #0001
+        '''
+        #slow_D는 주변에 물체를 인식했을 떄 적용되는 D항인데
+        #물체가 offset 범위에 들어왔을 때 급격하게 변하는 err 때문에
+        #D항이 크면 오히려 물체쪽으로 움직여버린다. 따라서 slow_D는 오히려 base_D보다 작아야 한다.
+        '''
+        self.base_sp = 2
+        self.slow_sp = 1
+
+        #속도모드 결정 범위
+        self.rngM_deg = 135
+        self.rngM_thres =0.80 # offset 결정 범위와 같아야 함. 아니면 순간적으로 sp=2의 이상한 K,D값이 적용된 구간이 생겨 와블링됨. 
+        # self.obj_offset1 = 0#100
+
+        #R offset 결정 범위
+        self.rng_deg_L = -90
+        self.rng_thres_L = 0.80 # 최소 0.80이어야 반응 할 수 있다.
+        self.obj_offset_L = 50 # 60이 오른바퀴가 딱 선에 걸치는 위치
+
+        #L offset 결정 범위
+        self.rng_deg_R = 90
+        self.rng_thres_R = 0.80 # 최소 0.80이어야 반응 할 수 있다.
+        self.obj_offset_R = -30 # 60이 오른바퀴가 딱 선에 걸치는 위치
+
         ###======================================================###
 
 
@@ -84,7 +121,7 @@ class Follower:
 
         if self.traffic_color == 1:
             green_cnt += 1
-            # print(green_cnt)
+            print(green_cnt)
 
     ## : /scan_raw 토픽에 따른 콜백함수 - lidar값 저장
     '''
@@ -100,18 +137,18 @@ class Follower:
     def lidar_callback(self, msg):
         # static offset
         # angles = [x for x in range(0, -90, -5)]  # [0, -5 , -10, ... , -85] : 12시에서 CW로 0~90도 사이 물체 탐지
-        angles = [x for x in range(0, -90, -5)]  # [-60, -65 , ... , -295] : 12시에서 CW로 30~150도 사이 물체 탐지
-        self.dists = [msg.ranges[x * 2] for x in angles]
-        # self.dists = [round(x,2) for x in self.dists]
-        # print(self.dists)
+        self.rngL = [msg.ranges[x * 2] for x in range(0, self.rng_deg_L, -3)]
+        self.rngR = [msg.ranges[x * 2] for x in range(0, self.rng_deg_R, 3)]
+        # self.rngL = [round(x,2) for x in self.rngL]
+        # print(self.rngL)
+        self.rngM = [msg.ranges[x * 2] for x in range(-self.rngM_deg, self.rngM_deg, 3)]
         
-
-
     
+
     ## : /usb_cam/image_raw 토픽에 따른 콜백함수 - line tracking 실행
     def image_callback(self, msg):
         global perr, ptime, serr, dt
-        global err1_prev, err2_prev
+        global err1_prev, err_prev
 
         # ------ take image and transform to hsv ------ #
         image0 = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -137,69 +174,72 @@ class Follower:
 
         # ============================================================================= #
 
-        lidar_flag = False
         # ----------------------- calculate offset -------------------------- #
-        if self.dists != None:
+        # ! lidar가 물체를 인식하는 순간 부터 처음으로 인식되는데 0.25~0.3초 정도 걸리고
+        # ! 바퀴가 중앙정렬에서 서보모터로 offset값 50을 완전히변경하는데 0.15초 정도가 걸린다.
+        
+        # ! 실험+ : 물체옆을 지나가고 0.3초후에 바퀴가 다시 라인쪽으로 바라보기 시작한다. 
+        
 
-            lateral_count = 0
-            for d in self.dists:
-                if d < self.dis_thres: 
-                    lateral_count += 1
+        K = self.base_K
+        D = self.base_D
+        speed = self.base_sp
+        if self.rngM != None:
+            lidar_count = 0
+            for d in self.rngM:
+                if d < self.rngM_thres: 
+                    lidar_count += 1
 
-            if lateral_count >= 1:
-                # print("lateral_cnt : {}".format(lateral_count))
-                roi1_offset = self.obj_offset1
-                roi2_offset = self.obj_offset2
-                lidar_flag = True
-            else:
-                roi1_offset = 0
-                roi2_offset = 0
+            if lidar_count >= 1:
+                K = self.slow_K
+                D = self.slow_D
+                speed = self.slow_sp
+
+        roi_offset = 0
+        if self.rngL != None:
+            lidar_count = 0
+            for d in self.rngL:
+                if d < self.rng_thres_L: 
+                    lidar_count += 1
+
+            if lidar_count >= 1:
+                roi_offset += self.obj_offset_L
+
         else:
-            roi1_offset = 0
-            roi2_offset = 0
+            roi_offset += 0
 
-        print(roi2_offset)
+
+        if self.rngR != None:
+            lidar_count = 0
+            for d in self.rngR:
+                if d < self.rng_thres_R: 
+                    lidar_count += 1
+
+            if lidar_count >= 1:
+                roi_offset += self.obj_offset_R
+
+        else:
+            roi_offset += 0
+
+
+        # print(roi_offset)
         # ============================================================================= #
 
 
         # ----------------------- calculate error -------------------------- #
-        # h, w = line_img.shape # 144, 192
-        h = 144
-        w = 192
-        w_mid = 96 # 120일 때 선을 거의 중앙에 둠, 근데 그럼 좌우 턴 최대값이 달라질 수 있음
-
-        roi1_down = 144     # 4/4 * h
-        roi1_up = 108       # 3/4 * h
-        roi1_mid = 126
-
-        roi2_down = 108     # 3/4 * h
-        roi2_up = 72        # 2/4 * h
-        roi2_mid = 90
-
-        roi1 = line_img[roi1_up:roi1_down, 0:w]
-        self.calc_center_point_idxavr(roi1, 1, 10)
-        err1 = self.roi_center_pix[1] - roi1_offset - w_mid
-        derr1 = err1 - err1_prev
-
-
-        roi2 = line_img[roi2_up:roi2_down, 0:w]
-        self.calc_center_point_idxavr(roi2, 2, 10)
-        err2 = self.roi_center_pix[2] - roi2_offset - w_mid
-        derr2 = err2 - err2_prev
+        roi = line_img[roi_up:roi_down, 0:w]
+        self.calc_center_point_idxavr(roi, 10)
+        err = self.roi_center_pix - roi_offset - w_mid
+        derr = err - err_prev
         # ==================================================================== #
 
 
         # ------------------------ debug image make -------------------------- #
         if self.debug:
-            cv2.circle(img, (w_mid, roi1_mid), 2, (0, 255, 255), 2)
-            cv2.putText(img, str(err1), (w_mid, roi1_mid), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,255), 1)
-            cv2.circle(img, (self.roi_center_pix[1], roi1_mid), 3, (0, 255, 0), 2) 
-            cv2.circle(img, (self.roi_center_pix[1] - roi1_offset, roi1_mid), 6, (255, 0, 0), 2)
-            
-            cv2.circle(img, (w_mid, roi2_mid), 2, (0, 255, 255), 2) 
-            cv2.putText(img, str(err2), (w_mid, roi2_mid), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,255), 1)
-            cv2.circle(img, (self.roi_center_pix[2], roi2_mid), 3, (0, 255, 0), 2) 
-            cv2.circle(img, (self.roi_center_pix[2] - roi2_offset, roi2_mid), 6, (255, 0, 0), 2)
+            cv2.circle(img, (w_mid, roi_mid), 2, (0, 255, 255), 2) 
+            cv2.putText(img, str(err), (w_mid, roi_mid), cv2.FONT_HERSHEY_PLAIN, 1, (0,255,255), 1)
+            cv2.circle(img, (self.roi_center_pix, roi_mid), 3, (0, 255, 0), 2) 
+            cv2.circle(img, (self.roi_center_pix - roi_offset, roi_mid), 6, (255, 0, 0), 2)
 
             self.image_debug_pub.publish(self.bridge.cv2_to_imgmsg(img,encoding='bgr8'))
         # ==================================================================== #
@@ -246,7 +286,7 @@ class Follower:
         sp=2, K1=0.004 D1=0.020  big swing
         sp=2, K1=0.004 D1=0.014  basic- swing
 
-        ang = err2 * self.K2 + derr2 * self.D2 : 
+        ang = err * self.K2 + derr * self.D2 : 
         sp=2, K2=0.004 D2=0.014  little swing
         sp=2, K2=0.004 D2=0.018  little swing but crash
         sp=2, K2=0.004 D2=0.012  almost no swing
@@ -265,30 +305,20 @@ class Follower:
         K가 높을 수록 반응성이 좋기 떄문에 와블링이 되지 않는 선에서 최대한 올리는 것이 좋다.
 
         '''
-
-        # if green_cnt >= 1:
+        # print(green_cnt)
+        # if green_cnt >= 5:
         if True:
-            speed = 2
-            # ang = err1 * self.K1 + derr1 * self.D1
-            ang = err2 * self.K2 + derr2 * self.D2
+            ang = err * K + derr * D
 
             self.twist.linear.x = speed
             self.twist.angular.z = -ang
-            
-            # if lidar_flag == False:
-            #     self.twist.linear.x = speed
-            #     self.twist.angular.z = -ang
-            # else:
-            #     self.twist.linear.x = 1
-            #     self.twist.angular.z = -ang
-
-            
+    
         # ==================================================================== #
         
 
         # ------------------------ message publish --------------------------- #
-        err1_prev = err1
-        err2_prev = err2
+        # err1_prev = err1
+        err_prev = err
 
         self.cmd_vel_pub.publish(self.twist)
         output_img = self.bridge.cv2_to_imgmsg(line_img)
@@ -298,7 +328,7 @@ class Follower:
     ## : def image_callback(self, msg) 함수에서 line의 중심점을 찾기 위해 사용
     # 이 함수는 모든 픽셀값에 대한 평균으로 정확한 평균 위치를 찾아주진 않지만 
     # 중위값을 계산함으로써 위 함수보다 빠르다. 또 노이즈 제거 효과도 있어서 calc_center_point_valavr보다 오히려 성능이 더 좋음.
-    def calc_center_point_idxavr(self, bframe, roi_num, threshold): #-> int
+    def calc_center_point_idxavr(self, bframe, threshold): #-> int
         
         # 이미지의 가로 인덱스별 픽셀 갯수 ndarray반환 : bframe_hist는 1차 ndarray 타입
         bframe_hist = numpy.sum(bframe,axis=0) 
@@ -308,7 +338,7 @@ class Follower:
 
         if len(pixel_idx_list) > 4 :
             # 즉, [가로 인덱스마다 세로로 합친 픽셀 갯수가 threshold값을 넘어가는 가로 인덱스값들](=[pixel_idx_list])의 평균을 반환
-            self.roi_center_pix[roi_num] = int(numpy.average(pixel_idx_list))
+            self.roi_center_pix = int(numpy.average(pixel_idx_list))
             
 # END CONTROL #
 
