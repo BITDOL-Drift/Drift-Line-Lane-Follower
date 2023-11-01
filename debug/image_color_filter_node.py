@@ -1,10 +1,10 @@
+#! /usr/bin/env python3
 # -*- coding:utf-8 -*-
 import cv2
 import numpy as np
 
 import rospy
 from cv_bridge import CvBridge
-
 from sensor_msgs.msg import Image
 
 cv_bridge = CvBridge()
@@ -152,7 +152,7 @@ class COLOR_FILTER:
 
 
 if __name__ == "__main__":
-    img = cv2.imread("img_src/hsv_table.png", cv2.IMREAD_COLOR)
+    img = cv2.imread("../img_src/hsv_table.png", cv2.IMREAD_COLOR)
     color_filter_node = COLOR_FILTER(img)
     image_sub = rospy.Subscriber('/usb_cam/image_raw', Image, color_filter_node.detect_callback, queue_size=1, buff_size=52428800)
     color_filter_node.run()
