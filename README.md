@@ -1,9 +1,9 @@
 # Drift-Line-Lane-Follower
 ## Overview
-**2023 DIFA Daegu Model Electric Vehicle Self-Driving Contest : Team DRFIT - Main driving + setup codes.**   
+**2023 DIFA Daegu Model Autonomous Car Driving Contest: Team DRIFT -- Main driving + setup codes.**   
 - Result : **2nd(22.7 sec)**
-- front_lidar_avoidance : main driving logic with PD Control & opencv Image processing
-- debug/image_color_filter_node.py : color calibration logic for image processing system
+- front_lidar_avoidance: main driving codes -- contains PD control and OpenCV-based Image processing logic 
+- debug/image_color_filter_node.py: color calibration and image pre-processing logic 
 ## Quick Start
 ```bash
 python3 front_lidar_avoidance.py
@@ -17,8 +17,8 @@ python3 front_lidar_avoidance.py
 * OpenCV 3.4.6
 
 ## Reference
-We used reference codes from here : https://github.com/nsa31/Line-Lane-Follower-Robot_ROS   
-which project is done at University of Alberta (UoA) for the course CMPUT 412 : Experimental Robotics.   
+We used reference codes from here: https://github.com/nsa31/Line-Lane-Follower-Robot_ROS   
+- At the University of Alberta (UoA) for the course CMPUT 412: Experimental Robotics.   
 
 https://www.ualberta.ca/computing-science/undergraduate-studies/course-directory/courses/experimental-mobile-robotics.html
 
