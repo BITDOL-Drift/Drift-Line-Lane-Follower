@@ -17,12 +17,13 @@ python3 front_lidar_avoidance.py
 * OpenCV 3.4.6
 
 ## Reference
-We used reference codes from here: https://github.com/nsa31/Line-Lane-Follower-Robot_ROS   
-- At the University of Alberta (UoA) for the course CMPUT 412: Experimental Robotics.   
-
+Reference codes for the zzangdol-ai-car project, including implementations of Hector SLAM and Navigation ROS packages,    
+are available on GitHub at https://github.com/nsa31/Line-Lane-Follower-Robot_ROS.    
+    
+These were developed as part of the University of Alberta's CMPUT 412 course on Experimental Robotics at   
 https://www.ualberta.ca/computing-science/undergraduate-studies/course-directory/courses/experimental-mobile-robotics.html
 
-### Reference Authors
+### The initial creators of this reference  
 
 * [Nazmus Sakib](https://github.com/nsa31)
 * **Vivian**
